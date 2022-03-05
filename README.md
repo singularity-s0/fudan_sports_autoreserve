@@ -1,10 +1,9 @@
-#  复旦大学体育场地自动预约 FDU Sports Auto Reserve
-**Note: Project WIP and is not fully ready for use**
+#  复旦大学体育场馆自动预约 FDU Sports Auto Reserve
 
 DISCLAIMER: Use at your own risk. The author is, to the extent permitted by law, not responsible for whatever happens during your use of this script, or caused by the script itself. This script comes with ABSOLUTELY no warranty.
 
 ## Usage
-- Replace every string in `main.py` with the appropriate values.
+- Replace strings in `main.py` with the appropriate values.
 - Run the script
 
 You may set the log level in `logs.py`
