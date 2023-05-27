@@ -6,6 +6,11 @@ import requests
 import logs
 from bs4 import BeautifulSoup
 
+import cv2
+import base64
+import numpy as np
+from datetime import datetime
+
 CUDA = None
 headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.3 Safari/605.1.15",
@@ -19,7 +24,7 @@ get_reservables_url = "https://elife.fudan.edu.cn/app/api/toResourceFrame.action
 sso_url = "https://elife.fudan.edu.cn/sso/login?targetUrl=base64aHR0cHM6Ly9lbGlmZS5mdWRhbi5lZHUuY24vYXBw"
 app_url = "https://elife.fudan.edu.cn/app/"
 reserve_url = "https://elife.fudan.edu.cn/app/api/order/saveOrder.action?op=order"
-captcha_url = "https://elife.fudan.edu.cn/app/image.jsp"
+captcha_url = "https://elife.fudan.edu.cn/public/front/getImgSwipe.htm?_="
 order_form_url = "https://elife.fudan.edu.cn/app/api/order/loadOrderForm_ordinary.action"
 search_url = "https://elife.fudan.edu.cn/app/api/search.action"
 error_string = "您将登录的是："
@@ -163,10 +168,11 @@ def reserve(s: requests.Session, service_id, service_cat_id, target_date, target
                     user_phone = input("Enter your phone: ")
 
                 logs.log_console("Begin Fetch Captcha", "INFO")
-                captcha_image = s.get(captcha_url).content
+                move_X = get_and_recognize_captcha(s, captcha_url)
                 response = s.post(reserve_url, data={"lastDays": 0, "orderuser": user_name,
                                                      "mobile": user_phone, "d_cgyy.bz": None,
-                                                     "imageCodeName": recongize_captcha(captcha_image),
+                                                     "moveEnd_X": move_X,
+                                                     "wbili": 1.0,
                                                      "resourceIds": reservable_option['id'],
                                                      "serviceContent.id": service_id,
                                                      "serviceCategory.id": service_cat_id,
@@ -185,12 +191,28 @@ def reserve(s: requests.Session, service_id, service_cat_id, target_date, target
                     "INFO")
 
 
-def recongize_captcha(image):
-    logs.log_console("Begin Captcha Recognition", "INFO")
-    ocr_recognizer = easyocr.Reader(['en'], gpu=False)
-    code_result = ocr_recognizer.recognize(image, reformat=True, allowlist='0123456789')
-    code_result_trimmed = code_result[0][1]
-    if len(code_result_trimmed) != 4:
-        logs.log_console("Invalid Captcha Recognition Result Length", "WARNING")
-    logs.log_console(f"Captcha Result: {code_result_trimmed}, Confidence: {code_result[0][2]}", "INFO")
-    return code_result_trimmed
+def get_and_recognize_captcha(s,captcha_url):
+    stamp = datetime.timestamp(datetime.now())
+    stamp = str(int(stamp*1000))
+    captcha_url += stamp
+    i = 0
+    while i<6:
+        try:
+            response = json.loads(s.get(captcha_url).text)["object"]
+        except Exception as e:
+            i += 1
+            continue
+        break
+    src_edge = image_convert(response["SrcImage"]) # base64 to edge
+    cut_edge = image_convert(response["CutImage"])
+    res = cv2.matchTemplate(cut_edge, src_edge, cv2.TM_CCOEFF_NORMED)
+    _, _, _, max_loc = cv2.minMaxLoc(res)
+    x = max_loc[0]
+    return x
+
+def image_convert(image):
+    image = base64.b64decode(image)
+    nparr = np.fromstring(image, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    edge = cv2.Canny(img, 100, 200)
+    return edge
