@@ -1,7 +1,6 @@
 import json
 import time
 
-import easyocr
 import requests
 import logs
 from bs4 import BeautifulSoup
